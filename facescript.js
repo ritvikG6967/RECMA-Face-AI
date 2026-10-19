@@ -12,6 +12,9 @@ const blinkDisplay = document.getElementById("blink_display");
 const statusText = document.getElementById("status");
 
 // 1. Initialize the MediaPipe Face Landmarker
+
+window.addEventListener('load', () => {
+  const { FaceLandmarker, FilesetResolver } = vision;
 async function initializeFaceLandmarker() {
   try {
     // Fetch the WebAssembly (WASM) files needed to run the model efficiently
@@ -101,5 +104,7 @@ async function predictWebcam() {
   requestAnimationFrame(predictWebcam);
 }
 
-// Kickstart the application
-initializeFaceLandmarker();
+
+  // ... the rest of your code ...
+  initializeFaceLandmarker();
+});
