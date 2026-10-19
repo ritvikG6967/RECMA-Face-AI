@@ -16,7 +16,7 @@ async function initializeFaceLandmarker() {
   try {
     // Fetch the WebAssembly (WASM) files needed to run the model efficiently
     const filesetResolver = await FilesetResolver.forVisionTasks(
-      "https://jsdelivr.net"
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
     );
     
     faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
