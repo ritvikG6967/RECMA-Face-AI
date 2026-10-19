@@ -47,6 +47,15 @@
         <canvas id="output_canvas"></canvas>
     </div>
     <h2 id="blink_display">Blinks: 0</h2>
+
+       <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js" crossorigin="anonymous"></script>
+   ```
+2. In the DevTools console, type `window` and look for the available MediaPipe objects (often named `tasksVision`).
+
+### Suggested fix
+
+When using the CDN bundle, the library is usually exported to the global scope as `tasksVision`. Update your code to use the correct global object name. Additionally, ensure the `initializeFaceLandmarker` function is properly closed and called.
+
     <script type="module" src="facescript.js"></script>
 
 </body>
