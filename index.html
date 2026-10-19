@@ -3,16 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs"
-    crossorigin="anonymous"></script>
-    <script src="https://jsdelivr.net" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js" crossorigin="anonymous"></script>
-    <script type="module">
-  import {
-    FaceLandmarker,
-    FilesetResolver
-  } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
-</script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -53,12 +43,11 @@
     <h1>MediaPipe Blink Detector</h1>
     <p id="status">Loading Face Mesh Model</p>
     <div class="video-container">
-        <video id="webcam" autoplay playsinline></video>
+        <video id="webcam" autoplay muted playsinline></video>
         <canvas id="output_canvas"></canvas>
     </div>
     <h2 id="blink_display">Blinks: 0</h2>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js" crossorigin="anonymous"></script>
-    <script type="module" src="facescript.js" defer></script>
+    <script type="module" src="facescript.js"></script>
 
 </body>
 </html>

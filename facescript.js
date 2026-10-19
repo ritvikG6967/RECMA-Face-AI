@@ -1,9 +1,9 @@
-// Access MediaPipe classes from the global window object loaded via CDN
-//const { FaceLandmarker, FilesetResolver } = vision;
+import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
 
 let faceLandmarker;
 let blinkCounter = 0;
 let eyesClosed = false;
+let lastVideoTime = -1;
 
 const video = document.getElementById("webcam");
 const canvasElement = document.getElementById("output_canvas");
@@ -11,100 +11,105 @@ const canvasCtx = canvasElement.getContext("2d");
 const blinkDisplay = document.getElementById("blink_display");
 const statusText = document.getElementById("status");
 
-// 1. Initialize the MediaPipe Face Landmarker
-
-window.addEventListener('load', () => {
-  const { FaceLandmarker, FilesetResolver } = vision;
 async function initializeFaceLandmarker() {
+  statusText.innerText = "Loading face model…";
+
   try {
-    // Fetch the WebAssembly (WASM) files needed to run the model efficiently
     const filesetResolver = await FilesetResolver.forVisionTasks(
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-);
-    
-    faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
-      baseOptions: {
-        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
-        delegate: "GPU" // Uses your graphics card for ultra-fast performance
-      },
-      outputFaceBlendshapes: true, // Crucial: Enables eyeBlink coefficients
-      runningMode: "VIDEO",
-      numFaces: 1
-    });
-    
-    statusText.innerText = "Model loaded! Starting webcam...";
-    startWebcam();
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+    );
+    const modelOptions = {
+      modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+      delegate: "GPU"
+    };
+
+    try {
+      faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+        baseOptions: modelOptions,
+        outputFaceBlendshapes: true,
+        runningMode: "VIDEO",
+        numFaces: 1
+      });
+    } catch (gpuError) {
+      console.warn("GPU delegate unavailable; retrying with CPU.", gpuError);
+      faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+        baseOptions: { ...modelOptions, delegate: "CPU" },
+        outputFaceBlendshapes: true,
+        runningMode: "VIDEO",
+        numFaces: 1
+      });
+    }
+
+    await startWebcam();
   } catch (error) {
-    statusText.innerText = "Error loading model. Check console.";
-    console.error(error);
+    statusText.innerText = `Could not start face tracking: ${error.message}`;
+    console.error("MediaPipe initialization failed:", error);
   }
 }
 
-// 2. Request webcam access and attach it to the HTML video element
-function startWebcam() {
-  navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
-    .then((stream) => {
-      video.srcObject = stream;
-      video.addEventListener("loadeddata", () => {
-        statusText.innerText = "Tracking active. Blink your eyes!";
-        predictWebcam();
-      });
-    })
-    .catch((err) => {
-      statusText.innerText = "Webcam access denied.";
-      console.error(err);
+async function startWebcam() {
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    statusText.innerText = "Webcam requires HTTPS or localhost. Open this page through a local development server.";
+    return;
+  }
+
+  statusText.innerText = "Requesting webcam access…";
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }
     });
+    video.srcObject = stream;
+    await video.play();
+
+    canvasElement.width = video.videoWidth;
+    canvasElement.height = video.videoHeight;
+    statusText.innerText = "Tracking active. Blink your eyes!";
+    requestAnimationFrame(predictWebcam);
+  } catch (error) {
+    const message = error.name === "NotAllowedError"
+      ? "Webcam permission was denied. Allow camera access in your browser settings and reload."
+      : error.name === "NotFoundError"
+        ? "No webcam was found. Connect or enable a camera and reload."
+        : `Could not open webcam: ${error.message}`;
+    statusText.innerText = message;
+    console.error("Webcam error:", error);
+  }
 }
 
-// 3. Main processing loop running at frame-rate speed
-let lastVideoTime = -1;
-async function predictWebcam() {
-  // Synchronize canvas dimensions with the active video
-  canvasElement.width = video.videoWidth;
-  canvasElement.height = video.videoHeight;
-
-  if (lastVideoTime !== video.currentTime) {
+function predictWebcam() {
+  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.currentTime !== lastVideoTime) {
     lastVideoTime = video.currentTime;
-    
-    // Process the current video frame
-    const startTimeMs = performance.now();
-    const results = faceLandmarker.detectForVideo(video, startTimeMs);
+    canvasElement.width = video.videoWidth;
+    canvasElement.height = video.videoHeight;
 
-    // Clear the drawing canvas every frame
-    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+    try {
+      const results = faceLandmarker.detectForVideo(video, performance.now());
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-    // Check if blendshapes are detected
-    if (results.faceBlendshapes && results.faceBlendshapes.length > 0) {
-      const blendshapes = results.faceBlendshapes[0].categories;
-      
-      // Pull specific blink metrics (values range from 0.0 to 1.0)
-      const blinkLeft = blendshapes.find(b => b.categoryName === "eyeBlinkLeft").score;
-      const blinkRight = blendshapes.find(b => b.categoryName === "eyeBlinkRight").score;
-      
-      // Average both eyes to ensure it's a structural blink (not a wink)
-      const currentBlinkScore = (blinkLeft + blinkRight) / 2.0;
+      const categories = results.faceBlendshapes?.[0]?.categories;
+      if (categories) {
+        const blinkLeft = categories.find(item => item.categoryName === "eyeBlinkLeft")?.score ?? 0;
+        const blinkRight = categories.find(item => item.categoryName === "eyeBlinkRight")?.score ?? 0;
+        const currentBlinkScore = (blinkLeft + blinkRight) / 2;
 
-      // Threshold Tuning: 0.70 means eyes are roughly 70% closed
-      if (currentBlinkScore > 0.70) {
-        if (!eyesClosed) {
-          eyesClosed = true; // State change: eyes just closed
-        }
-      } else if (currentBlinkScore < 0.30) {
-        if (eyesClosed) {
-          // State change: eyes just opened after a valid closure
+        if (currentBlinkScore > 0.7) {
+          eyesClosed = true;
+        } else if (currentBlinkScore < 0.3 && eyesClosed) {
           blinkCounter++;
           blinkDisplay.innerText = `Blinks: ${blinkCounter}`;
-          eyesClosed = false; 
+          eyesClosed = false;
         }
       }
+    } catch (error) {
+      statusText.innerText = "Face tracking stopped. See the browser console for details.";
+      console.error("Face detection failed:", error);
+      return;
     }
   }
 
-  // Continuously request the next frame loop
   requestAnimationFrame(predictWebcam);
 }
 
-
-  // ... the rest of your code ...
-  initializeFaceLandmarker();
-});
+initializeFaceLandmarker();
