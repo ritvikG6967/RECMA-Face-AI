@@ -1,5 +1,5 @@
 // Access MediaPipe classes from the global window object loaded via CDN
-const { FaceLandmarker, FilesetResolver } = vision;
+//const { FaceLandmarker, FilesetResolver } = vision;
 
 let faceLandmarker;
 let blinkCounter = 0;
